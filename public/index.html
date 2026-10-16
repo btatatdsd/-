@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Co-Drive — لعبة السياقة التعاونية</title>
+<style>
+  :root{
+    --bg:#0b1020; --panel:#131a2e; --panel2:#1b2440;
+    --accent:#2ee6a8; --accent2:#ffb020; --danger:#ff5470;
+    --text:#e8edf7; --muted:#8b97b5; --line:#25304d;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+    font-family:'Segoe UI',Tahoma,system-ui,-apple-system,sans-serif;overflow:hidden}
+  button{font-family:inherit;cursor:pointer;border:none;border-radius:10px;
+    padding:12px 20px;font-size:15px;font-weight:700;transition:.15s;color:#04121a;
+    background:linear-gradient(135deg,var(--accent),#25c4ff)}
+  button:hover{transform:translateY(-2px);filter:brightness(1.1)}
+  button:active{transform:translateY(0)}
+  button.ghost{background:transparent;border:1.5px solid var(--line);color:var(--text)}
+  button.warn{background:linear-gradient(135deg,var(--accent2),#ff8a3d)}
+  button.danger{background:linear-gradient(135deg,var(--danger),#ff8a3d);color:#fff}
+  .hidden{display:none !important}
+
+  /* MENU */
+  #menu{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:26px;padding:24px;
+    background:radial-gradient(ellipse at 50% -10%,#1d2b52 0%,#0b1020 60%);z-index:50}
+  #menu h1{margin:0;font-size:52px;letter-spacing:-1px;
+    background:linear-gradient(90deg,var(--accent),#4ea8ff,var(--accent2));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  #menu .sub{color:var(--muted);margin:-14px 0 0;font-size:16px}
+  .cards{display:flex;gap:22px;flex-wrap:wrap;justify-content:center;max-width:760px}
+  .card{background:var(--panel);border:1.5px solid var(--line);border-radius:18px;
+    padding:26px;width:320px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.45)}
+  .card h2{margin:0 0 8px;font-size:22px}
+  .card p{color:var(--muted);font-size:14px;margin:0 0 18px;line-height:1.6}
+  .card input{width:100%;padding:12px;border-radius:10px;border:1.5px solid var(--line);
+    background:#0d1425;color:var(--text);font-size:22px;text-align:center;
+    letter-spacing:8px;font-weight:800;margin-bottom:12px;outline:none;font-family:inherit}
+  .card input:focus{border-color:var(--accent)}
+  .card button{width:100%}
+  #menuMsg{min-height:24px;color:var(--accent2);font-weight:700;font-size:15px;text-align:center}
+
+  /* GAME */
+  #game{position:fixed;inset:0}
+  #view3d{position:absolute;inset:0}
+
+  #hud{position:absolute;top:16px;right:16px;display:flex;gap:10px;flex-direction:column;
+    align-items:flex-end;pointer-events:none;z-index:10}
+  .pill{background:rgba(13,20,37,.82);border:1.5px solid var(--line);border-radius:12px;
+    padding:8px 14px;font-weight:800;font-size:14px;backdrop-filter:blur(8px);
+    display:flex;gap:8px;align-items:center}
+  .pill .lbl{color:var(--muted);font-weight:600;font-size:12px}
+  .pill.big{font-size:22px;padding:10px 18px}
+
+  #speedo{position:absolute;bottom:24px;left:24px;background:rgba(13,20,37,.85);
+    border:1.5px solid var(--line);border-radius:16px;padding:14px 22px;z-index:10;
+    backdrop-filter:blur(8px);text-align:center}
+  #speedo .val{font-size:44px;font-weight:900;line-height:1;color:var(--accent)}
+  #speedo .unit{font-size:12px;color:var(--muted);margin-top:2px}
+
+  /* Navigator tablet */
+  #tablet{position:absolute;inset:0;display:flex;flex-direction:column;
+    background:#070c18;z-index:20}
+  #tablet .top{display:flex;align-items:center;gap:12px;padding:12px 18px;
+    background:var(--panel);border-bottom:1.5px solid var(--line);flex-wrap:wrap}
+  #tablet .top .dot{width:10px;height:10px;border-radius:50%;background:var(--danger)}
+  #tablet .top .dot.on{background:var(--accent);box-shadow:0 0 12px var(--accent)}
+  #tablet .top h3{margin:0;font-size:16px}
+  #mapWrap{flex:1;position:relative;background:#0a1120}
+  #map{width:100%;height:100%;display:block}
+
+  #instr{position:absolute;top:16px;left:50%;transform:translateX(-50%);
+    background:rgba(13,20,37,.94);border:2px solid var(--accent);border-radius:16px;
+    padding:14px 30px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.5);
+    min-width:280px;z-index:5}
+  #instr .arrow{font-size:52px;line-height:1;margin-bottom:4px}
+  #instr .txt{font-size:22px;font-weight:900}
+  #instr .dist{font-size:14px;color:var(--muted);margin-top:4px}
+
+  #navBar{display:flex;gap:8px;padding:12px 18px;background:var(--panel);
+    border-top:1.5px solid var(--line);flex-wrap:wrap}
+  #navBar button{flex:1;min-width:110px;font-size:14px;padding:14px 8px}
+
+  /* Chat */
+  #chatBox{position:absolute;bottom:100px;left:24px;width:320px;z-index:15;
+    display:flex;flex-direction:column;gap:8px}
+  #chatLog{max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
+  #chatLog .msg{background:rgba(13,20,37,.88);border:1.5px solid var(--line);
+    border-radius:10px;padding:8px 12px;font-size:13px;backdrop-filter:blur(6px)}
+  #chatLog .msg.me{border-color:var(--accent);color:var(--accent)}
+  #chatForm{display:flex;gap:6px}
+  #chatForm input{flex:1;padding:10px 12px;border-radius:10px;border:1.5px solid var(--line);
+    background:rgba(13,20,37,.9);color:var(--text);outline:none;font-family:inherit;font-size:13px}
+  #chatForm input:focus{border-color:var(--accent)}
+  #chatForm button{padding:10px 16px;font-size:13px}
+
+  #toast{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    background:rgba(13,20,37,.96);border:2px solid var(--accent);border-radius:18px;
+    padding:26px 46px;font-size:26px;font-weight:900;z-index:40;text-align:center;
+    pointer-events:none;opacity:0;transition:opacity .3s}
+  #toast.show{opacity:1}
+
+  #waiting{position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:16px;background:rgba(11,16,32,.96);z-index:30}
+  #waiting .code{font-size:64px;font-weight:900;letter-spacing:16px;color:var(--accent);
+    text-shadow:0 0 40px rgba(46,230,168,.6)}
+  #waiting p{color:var(--muted);margin:0;font-size:16px}
+
+  #voiceBtn.rec{background:linear-gradient(135deg,var(--danger),#ff8a3d);color:#fff;
+    animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,84,112,.6)}
+    50%{box-shadow:0 0 0 12px rgba(255,84,112,0)}}
+  #chatLog::-webkit-scrollbar{width:6px}
+  #chatLog::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+
+  .ctrlHint{position:absolute;top:16px;left:16px;z-index:15;display:flex;gap:8px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+
+<!-- MENU -->
+<div id="menu">
+  <h1>🚗 Co-Drive</h1>
+  <p class="sub">لعبة سياقة تعاونية بين جوج لاعبين — واحد كيسوق وواحد كيوجّه</p>
+  <div class="cards">
+    <div class="card">
+      <h2>🚗 السائق</h2>
+      <p>سوق الطوموبيل، تبع تعليمات النافيݣاتور، وما تشوفش الخريطة.</p>
+      <button id="btnCreate">إنشاء غرفة</button>
+    </div>
+    <div class="card">
+      <h2>📱 النافيݣاتور</h2>
+      <p>شوف الخريطة والطريق، ووجّه السائق باليمين واليسار.</p>
+      <input id="codeInput" placeholder="0000" maxlength="4" inputmode="numeric" />
+      <button id="btnJoin" class="warn">دخول بالكود</button>
+    </div>
+  </div>
+  <div id="menuMsg"></div>
+</div>
+
+<!-- GAME -->
+<div id="game" class="hidden">
+  <div id="view3d"></div>
+
+  <!-- HUD (driver) -->
+  <div id="hud">
+    <div class="pill big"><span class="lbl">الهدف</span><span id="hudDist">--</span> م</div>
+    <div class="pill"><span class="lbl">الوقت</span><span id="hudTime">--</span></div>
+    <div class="pill"><span class="lbl">النقط</span><span id="hudScore">0</span></div>
+    <div class="pill"><span class="lbl">المستوى</span><span id="hudLevel">1</span></div>
+  </div>
+
+  <div id="speedo">
+    <div class="val" id="speedVal">0</div>
+    <div class="unit">كم/س</div>
+  </div>
+
+  <!-- Navigator tablet -->
+  <div id="tablet" class="hidden">
+    <div class="top">
+      <div class="dot" id="linkDot"></div>
+      <h3>📡 GPS Navigator</h3>
+      <div style="flex:1"></div>
+      <div class="pill"><span class="lbl">السرعة</span><span id="navSpeed">0</span> كم/س</div>
+      <div class="pill"><span class="lbl">الوقت</span><span id="navTime">--</span></div>
+      <div class="pill"><span class="lbl">النقط</span><span id="navScore">0</span></div>
+    </div>
+    <div id="mapWrap">
+      <canvas id="map"></canvas>
+      <div id="instr">
+        <div class="arrow" id="instrArrow">⬆️</div>
+        <div class="txt" id="instrTxt">كنتسناو...</div>
+        <div class="dist" id="instrDist">--</div>
+      </div>
+    </div>
+    <div id="navBar">
+      <button class="ghost" data-cmd="دور على اليمين">➡️ يمين</button>
+      <button class="ghost" data-cmd="دور على اليسار">⬅️ يسار</button>
+      <button class="ghost" data-cmd="سير نيشان">⬆️ نيشان</button>
+      <button class="ghost" data-cmd="نقص السرعة">🛑 نقص</button>
+      <button class="ghost" data-cmd="وقّف!">⛔ وقّف</button>
+    </div>
+  </div>
+
+  <!-- Chat -->
+  <div id="chatBox">
+    <div id="chatLog"></div>
+    <form id="chatForm">
+      <input id="chatInput" placeholder="كتب رسالة..." autocomplete="off" />
+      <button type="submit">إرسال</button>
+    </form>
+  </div>
+
+  <div class="ctrlHint">
+    <button id="voiceBtn" class="ghost">🎤 الصوت</button>
+    <button id="camBtn" class="ghost">📷 الكاميرا</button>
+    <button id="leaveBtn" class="ghost">🚪 خروج</button>
+  </div>
+
+  <div id="toast"></div>
+
+  <!-- Waiting overlay -->
+  <div id="waiting" class="hidden">
+    <p>عطي هاد الكود لصاحبك:</p>
+    <div class="code" id="waitCode">----</div>
+    <p id="waitHint">كنتسنّاو اللاعب الثاني يدخل...</p>
+    <button id="copyBtn" class="ghost" style="margin-top:12px">📋 نسخ الكود</button>
+  </div>
+</div>
+
+<audio id="remoteAudio" autoplay></audio>
+
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* =========================================================
+   NETWORK
+   ========================================================= */
+const net = {
+  ws: null, role: null, code: null, peerReady: false,
+  connect(){
+    return new Promise((res, rej)=>{
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const ws = new WebSocket(`${proto}//${location.host}`);
+      const t = setTimeout(()=>rej(new Error('timeout')), 8000);
+      ws.onopen = ()=>{ clearTimeout(t); this.ws = ws; res(ws); };
+      ws.onerror = ()=>{ clearTimeout(t); rej(new Error('فشل الاتصال')); };
+    });
+  },
+  send(o){ if(this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify(o)); }
+};
+
+const $ = id => document.getElementById(id);
+const menu = $('menu'), gameEl = $('game'), tablet = $('tablet');
+const waiting = $('waiting');
+
+function toast(msg, ms=1600){
+  const t = $('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t);
+  t._t = setTimeout(()=>t.classList.remove('show'), ms);
+}
+function addChat(text, me=false){
+  const d = document.createElement('div');
+  d.className = 'msg' + (me?' me':'');
+  d.textContent = (me?'أنا: ':'صاحبي: ') + text;
+  $('chatLog').appendChild(d);
+  $('chatLog').scrollTop = 1e6;
+}
+
+async function startNet(){
+  try { await net.connect(); }
+  catch(e){ $('menuMsg').textContent = 'ما قدرناش نتصلو بالسيرفر.'; throw e; }
+
+  net.ws.onmessage = ev => {
+    let m; try { m = JSON.parse(ev.data); } catch { return; }
+
+    if(m.type === 'created'){
+      net.role = 'driver'; net.code = m.code;
+      $('waitCode').textContent = m.code;
+      waiting.classList.remove('hidden');
+      startGameUI();
+    }
+    else if(m.type === 'joined'){
+      net.role = 'navigator'; net.code = m.code;
+      startGameUI();
+    }
+    else if(m.type === 'ready'){
+      net.peerReady = true;
+      waiting.classList.add('hidden');
+      $('linkDot')?.classList.add('on');
+      toast('صاحبك دخل! 🎉', 1400);
+      if(net.role === 'driver') newTask();
+    }
+    else if(m.type === 'error'){
+      $('menuMsg').textContent = m.message;
+      if(!menu.classList.contains('hidden') === false) menu.classList.remove('hidden');
+    }
+    else if(m.type === 'state'){
+      remoteCar.x = m.x; remoteCar.z = m.z;
+      remoteCar.angle = m.angle; remoteCar.speed = m.speed;
+      remoteCar.valid = true;
+    }
+    else if(m.type === 'task'){
+      dest.x = m.x; dest.z = m.z;
+      beacon.position.set(dest.x, 0, dest.z);
+      level = m.level; score = m.score; timeLeft = m.time;
+      updateNavHUD();
+    }
+    else if(m.type === 'progress'){
+      level = m.level; score = m.score; timeLeft = m.time;
+    }
+    else if(m.type === 'chat'){ addChat(m.text); }
+    else if(m.type === 'signal'){ handleSignal(m.data); }
+    else if(m.type === 'peerLeft'){
+      net.peerReady = false;
+      $('linkDot')?.classList.remove('on');
+      toast('صاحبك خرج من اللعبة 😢', 2500);
+    }
+  };
+}
+
+const remoteCar = { x:0, z:0, angle:0, speed:0, valid:false };
+
+function startGameUI(){
+  menu.classList.add('hidden');
+  gameEl.classList.remove('hidden');
+  resize();
+
+  if(net.role === 'navigator'){
+    tablet.classList.remove('hidden');
+    $('speedo').classList.add('hidden');
+    $('hud').classList.add('hidden');
+    sizeMap();
+  } else {
+    tablet.classList.add('hidden');
+  }
+}
+
+$('btnCreate').onclick = async ()=>{
+  $('menuMsg').textContent = 'كنتصلو...';
+  try { await startNet(); } catch { return; }
+  net.send({ type:'create' });
+};
+$('btnJoin').onclick = async ()=>{
+  const code = $('codeInput').value.trim();
+  if(code.length !== 4){ $('menuMsg').textContent = 'دخل كود ديال 4 أرقام'; return; }
+  $('menuMsg').textContent = 'كنتصلو...';
+  try { await startNet(); } catch { return; }
+  net.send({ type:'join', code });
+};
+$('codeInput').addEventListener('keydown', e=>{ if(e.key==='Enter') $('btnJoin').click(); });
+$('copyBtn').onclick = ()=>{
+  navigator.clipboard.writeText($('waitCode').textContent);
+  toast('تنسخ الكود ✅', 1000);
+};
+$('leaveBtn').onclick = ()=>{ location.reload(); };
+
+$('chatForm').onsubmit = e => {
+  e.preventDefault();
+  const v = $('chatInput').value.trim();
+  if(!v) return;
+  addChat(v, true);
+  net.send({ type:'chat', text:v });
+  $('chatInput').value = '';
+};
+
+document.querySelectorAll('#navBar button').forEach(b=>{
+  b.onclick = ()=>{
+    const cmd = b.dataset.cmd;
+    addChat(cmd, true);
+    net.send({ type:'chat', text: cmd });
+  };
+});
+
+/* =========================================================
+   VOICE (WebRTC)
+   ========================================================= */
+let pc = null, localStream = null;
+const remoteAudio = $('remoteAudio');
+
+async function setupVoice(initiator){
+  if(!pc){
+    try { localStream = await navigator.mediaDevices.getUserMedia({audio:true}); }
+    catch(e){ toast('ما قدرناش نوصلو للمايكروفون', 2200); return; }
+
+    pc = new RTCPeerConnection({ iceServers:[
+      {urls:'stun:stun.l.google.com:19302'},
+      {urls:'stun:stun1.l.google.com:19302'}
+    ]});
+    localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+    pc.ontrack = e => { remoteAudio.srcObject = e.streams[0]; };
+    pc.onicecandidate = e => {
+      if(e.candidate) net.send({ type:'signal', data:{ candidate:e.candidate } });
+    };
+    pc.onconnectionstatechange = ()=>{
+      $('voiceBtn').classList.toggle('rec', pc.connectionState === 'connected');
+    };
+  }
+  if(initiator){
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    net.send({ type:'signal', data:{ sdp: pc.localDescription } });
+  }
+}
+async function handleSignal(data){
+  if(!pc) { await setupVoice(false); if(!pc) return; }
+  if(data.sdp){
+    await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+    if(data.sdp.type === 'offer'){
+      const ans = await pc.createAnswer();
+      await pc.setLocalDescription(ans);
+      net.send({ type:'signal', data:{ sdp: pc.localDescription } });
+    }
+  } else if(data.candidate){
+    try { await pc.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch(e){}
+  }
+}
+$('voiceBtn').onclick = async ()=>{
+  if(!pc){
+    await setupVoice(net.role === 'driver');
+    $('voiceBtn').classList.add('rec');
+    toast('الصوت خدام 🎤', 1200);
+  } else {
+    const t = localStream.getAudioTracks()[0];
+    if(!t) return;
+    t.enabled = !t.enabled;
+    $('voiceBtn').classList.toggle('rec', t.enabled);
+    toast(t.enabled ? 'المايك مفتوح' : 'المايك مسدود', 900);
+  }
+};
+
+/* =========================================================
+   THREE.JS SCENE
+   ========================================================= */
+const view3d = $('view3d');
+const renderer = new THREE.WebGLRenderer({antialias:true, powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+view3d.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x8fc0e8);
+scene.fog = new THREE.Fog(0x8fc0e8, 150, 400);
+
+const camera = new THREE.PerspectiveCamera(72, innerWidth/innerHeight, 0.1, 1500);
+
+scene.add(new THREE.HemisphereLight(0xcfe6ff, 0x445566, 1.1));
+const sun = new THREE.DirectionalLight(0xffffff, 1.4);
+sun.position.set(80, 140, 60);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048,2048);
+const sc = sun.shadow.camera;
+sc.left=-180; sc.right=180; sc.top=180; sc.bottom=-180; sc.far=500;
+scene.add(sun);
+
+// Ground
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(1000,1000),
+  new THREE.MeshLambertMaterial({color:0x3f6b4a})
+);
+ground.rotation.x = -Math.PI/2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+/* ---------- CITY ---------- */
+const GRID = 6;
+const ROAD_W = 9;
+const BLOCK = 30;
+const SPACING = ROAD_W + BLOCK;
+const WORLD = (GRID-1)*SPACING;
+const roadCoord = i => (i - (GRID-1)/2) * SPACING;
+
+const roadMat = new THREE.MeshLambertMaterial({color:0x2b2f3a});
+const lineMat = new THREE.MeshBasicMaterial({color:0xf0d24a});
+
+for(let i=0;i<GRID;i++){
+  const c = roadCoord(i);
+  const h = new THREE.Mesh(new THREE.PlaneGeometry(WORLD+ROAD_W*2, ROAD_W), roadMat);
+  h.rotation.x = -Math.PI/2; h.position.set(0, 0.02, c); h.receiveShadow=true; scene.add(h);
+  const v = new THREE.Mesh(new THREE.PlaneGeometry(ROAD_W, WORLD+ROAD_W*2), roadMat);
+  v.rotation.x = -Math.PI/2; v.position.set(c, 0.02, 0); v.receiveShadow=true; scene.add(v);
+
+  for(let t=-WORLD/2; t<=WORLD/2; t+=7){
+    const dh = new THREE.Mesh(new THREE.PlaneGeometry(3, 0.45), lineMat);
+    dh.rotation.x=-Math.PI/2; dh.position.set(t, 0.03, c); scene.add(dh);
+    const dv = new THREE.Mesh(new THREE.PlaneGeometry(0.45, 3), lineMat);
+    dv.rotation.x=-Math.PI/2; dv.position.set(c, 0.03, t); scene.add(dv);
+  }
+}
+
+// Buildings + colliders
+const buildings = [];
+const bColors = [0x46557a, 0x39466b, 0x53628a, 0x2f3b5c, 0x5b4a70, 0x6b5570];
+const bMats = bColors.map(c=>new THREE.MeshLambertMaterial({color:c}));
+
+for(let i=0;i<GRID-1;i++){
+  for(let j=0;j<GRID-1;j++){
+    const cx = (roadCoord(i)+roadCoord(i+1))/2;
+    const cz = (roadCoord(j)+roadCoord(j+1))/2;
+    const n = 2 + Math.floor(Math.random()*3);
+    for(let k=0;k<n;k++){
+      const w = 6 + Math.random()*12;
+      const d = 6 + Math.random()*12;
+      const hgt = 8 + Math.random()*28;
+      const ox = (Math.random()-0.5)*(BLOCK - w - 3);
+      const oz = (Math.random()-0.5)*(BLOCK - d - 3);
+      const x = cx+ox, z = cz+oz;
+      const m = new THREE.Mesh(
+        new THREE.BoxGeometry(w,hgt,d),
+        bMats[Math.floor(Math.random()*bMats.length)]
+      );
+      m.position.set(x, hgt/2, z);
+      m.castShadow = true; m.receiveShadow = true;
+      scene.add(m);
+      buildings.push({minX:x-w/2, maxX:x+w/2, minZ:z-d/2, maxZ:z+d/2});
+    }
+  }
+}
+
+// Trees
+const treeMat = new THREE.MeshLambertMaterial({color:0x2a5035});
+const trunkMat = new THREE.MeshLambertMaterial({color:0x3a2a1a});
+for(let i=0;i<GRID;i++){
+  for(let j=0;j<GRID;j++){
+    if(Math.random() > 0.5) continue;
+    const x = roadCoord(i) + (Math.random()-0.5)*6;
+    const z = roadCoord(j) + (Math.random()-0.5)*6;
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.5,2.5,6), trunkMat);
+    trunk.position.set(x, 1.25, z); trunk.castShadow = true; scene.add(trunk);
+    const leaves = new THREE.Mesh(new THREE.SphereGeometry(2.4,8,6), treeMat);
+    leaves.position.set(x, 3.6, z); leaves.castShadow = true; scene.add(leaves);
+  }
+}
+
+/* ---------- CAR ---------- */
+const carGroup = new THREE.Group();
+const bodyMat = new THREE.MeshLambertMaterial({color:0xe63946});
+const body = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.9, 4.4), bodyMat);
+body.position.y = 1.0; body.castShadow = true; carGroup.add(body);
+const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.85, 2.0),
+  new THREE.MeshLambertMaterial({color:0x1d2436}));
+cabin.position.set(0, 1.8, -0.25); cabin.castShadow = true; carGroup.add(cabin);
+
+const lampMat = new THREE.MeshBasicMaterial({color:0xfff4c2});
+[-0.7,0.7].forEach(x=>{
+  const l = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.25,0.15), lampMat);
+  l.position.set(x, 1.05, 2.22); carGroup.add(l);
+});
+const tailMat = new THREE.MeshBasicMaterial({color:0xff3030});
+[-0.7,0.7].forEach(x=>{
+  const l = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.25,0.15), tailMat);
+  l.position.set(x, 1.05, -2.22); carGroup.add(l);
+});
+
+const wheelGeo = new THREE.CylinderGeometry(0.55,0.55,0.4,14);
+const wheelMat = new THREE.MeshLambertMaterial({color:0x14161d});
+[[-1.15,1.45],[1.15,1.45],[-1.15,-1.45],[1.15,-1.45]].forEach(([x,z])=>{
+  const w = new THREE.Mesh(wheelGeo, wheelMat);
+  w.rotation.z = Math.PI/2; w.position.set(x,0.55,z); w.castShadow=true;
+  carGroup.add(w);
+});
+scene.add(carGroup);
+
+/* ---------- BEACON ---------- */
+const beacon = new THREE.Group();
+const beam = new THREE.Mesh(
+  new THREE.CylinderGeometry(1.8,1.8,60,20,1,true),
+  new THREE.MeshBasicMaterial({color:0x2ee6a8, transparent:true, opacity:0.28, side:THREE.DoubleSide})
+);
+beam.position.y = 30; beacon.add(beam);
+const ring = new THREE.Mesh(
+  new THREE.TorusGeometry(3.2, 0.35, 10, 32),
+  new THREE.MeshBasicMaterial({color:0x2ee6a8})
+);
+ring.rotation.x = Math.PI/2; ring.position.y = 0.4; beacon.add(ring);
+scene.add(beacon);
+
+/* =========================================================
+   GAME STATE
+   ========================================================= */
+const car = { x: roadCoord(2), z: roadCoord(2), angle: 0, speed: 0 };
+const MAXSPEED = 28;
+const keys = { up:false, down:false, left:false, right:false, brake:false };
+
+let dest = { x: roadCoord(4), z: roadCoord(0) };
+let level = 1, score = 0, timeLeft = 90;
+let gameActive = false;
+let camMode = 0; // 0=chase, 1=inside, 2=top
+let lastNetSend = 0;
+
+/* =========================================================
+   A* PATHFINDING
+   ========================================================= */
+const nodePos = n => ({ x: roadCoord(n % GRID), z: roadCoord(Math.floor(n / GRID)) });
+const nodeIdx = (i,j) => j*GRID + i;
+
+function nearestNode(x,z){
+  let best = 0, bd = Infinity;
+  for(let j=0;j<GRID;j++) for(let i=0;i<GRID;i++){
+    const d = (roadCoord(i)-x)**2 + (roadCoord(j)-z)**2;
+    if(d < bd){ bd = d; best = nodeIdx(i,j); }
+  }
+  return best;
+}
+function neighbors(n){
+  const i = n % GRID, j = Math.floor(n / GRID), out = [];
+  if(i>0) out.push(nodeIdx(i-1,j));
+  if(i<GRID-1) out.push(nodeIdx(i+1,j));
+  if(j>0) out.push(nodeIdx(i,j-1));
+  if(j<GRID-1) out.push(nodeIdx(i,j+1));
+  return out;
+}
+function hNode(a,b){
+  const pa = nodePos(a), pb = nodePos(b);
+  return Math.abs(pa.x-pb.x) + Math.abs(pa.z-pb.z);
+}
+function aStar(start, goal){
+  const open = [start];
+  const came = {};
+  const g = { [start]: 0 };
+  const f = { [start]: hNode(start, goal) };
+  const closed = new Set();
+  while(open.length){
+    open.sort((a,b)=>(f[a]??1e9)-(f[b]??1e9));
+    const cur = open.shift();
+    if(cur === goal){
+      const path = [cur];
+      let c = cur;
+      while(came[c] !== undefined){ c = came[c]; path.unshift(c); }
+      return path;
+    }
+    closed.add(cur);
+    for(const nb of neighbors(cur)){
+      if(closed.has(nb)) continue;
+      const t = g[cur] + 1;
+      if(g[nb] === undefined || t < g[nb]){
+        came[nb] = cur; g[nb] = t; f[nb] = t + hNode(nb, goal);
+        if(!open.includes(nb)) open.push(nb);
+      }
+    }
+  }
+  return [start, goal];
+}
+function computeRoute(cx,cz,dx,dz){
+  const s = nearestNode(cx,cz), e = nearestNode(dx,dz);
+  const nodes = aStar(s,e);
+  const pts = [{x:cx, z:cz}];
+  for(const n of nodes){ const p = nodePos(n); pts.push({x:p.x, z:p.z}); }
+  pts.push({x:dx, z:dz});
+  return pts;
+}
+
+/* =========================================================
+   MAP RENDERING
+   ========================================================= */
+const mapCanvas = $('map');
+const mctx = mapCanvas.getContext('2d');
+let mapScale = 1, mapOffX = 0, mapOffY = 0;
+
+function sizeMap(){
+  const r = mapCanvas.parentElement.getBoundingClientRect();
+  const dpr = Math.min(devicePixelRatio, 2);
+  mapCanvas.width = r.width * dpr;
+  mapCanvas.height = r.height * dpr;
+  mapCanvas.style.width = r.width+'px';
+  mapCanvas.style.height = r.height+'px';
+  mctx.setTransform(dpr,0,0,dpr,0,0);
+  const pad = 60;
+  const span = WORLD + ROAD_W*2 + 20;
+  mapScale = Math.min((r.width - pad*2)/span, (r.height - pad*2)/span);
+  mapOffX = r.width/2;
+  mapOffY = r.height/2;
+}
+function w2m(x,z){ return [ mapOffX + x*mapScale, mapOffY + z*mapScale ]; }
+
+function drawMap(route, carX, carZ, carAngle){
+  const w = mapCanvas.clientWidth, hh = mapCanvas.clientHeight;
+  mctx.clearRect(0,0,w,hh);
+  mctx.fillStyle = '#0a1120'; mctx.fillRect(0,0,w,hh);
+
+  // Green area
+  mctx.fillStyle = '#16281c';
+  const [gx,gy] = w2m(-WORLD/2-ROAD_W, -WORLD/2-ROAD_W);
+  mctx.fillRect(gx, gy, (WORLD+ROAD_W*2)*mapScale, (WORLD+ROAD_W*2)*mapScale);
+
+  // Roads
+  mctx.strokeStyle = '#39425c';
+  mctx.lineWidth = ROAD_W * mapScale;
+  mctx.lineCap = 'butt';
+  for(let i=0;i<GRID;i++){
+    const c = roadCoord(i);
+    let a = w2m(-WORLD/2-ROAD_W, c), b = w2m(WORLD/2+ROAD_W, c);
+    mctx.beginPath(); mctx.moveTo(a[0],a[1]); mctx.lineTo(b[0],b[1]); mctx.stroke();
+    a = w2m(c, -WORLD/2-ROAD_W); b = w2m(c, WORLD/2+ROAD_W);
+    mctx.beginPath(); mctx.moveTo(a[0],a[1]); mctx.lineTo(b[0],b[1]); mctx.stroke();
+  }
+
+  // Buildings
+  mctx.fillStyle = '#212a42';
+  for(const b of buildings){
+    const [x1,y1] = w2m(b.minX, b.minZ);
+    mctx.fillRect(x1, y1, (b.maxX-b.minX)*mapScale, (b.maxZ-b.minZ)*mapScale);
+  }
+
+  // Route
+  if(route && route.length > 1){
+    mctx.strokeStyle = '#2ee6a8';
+    mctx.lineWidth = 6;
+    mctx.lineJoin = 'round'; mctx.lineCap = 'round';
+    mctx.shadowColor = '#2ee6a8'; mctx.shadowBlur = 16;
+    mctx.beginPath();
+    const [sx,sy] = w2m(route[0].x, route[0].z);
+    mctx.moveTo(sx,sy);
+    for(let i=1;i<route.length;i++){
+      const [px,py] = w2m(route[i].x, route[i].z);
+      mctx.lineTo(px,py);
+    }
+    mctx.stroke();
+    mctx.shadowBlur = 0;
+  }
+
+  // Destination
+  const [dx,dy] = w2m(dest.x, dest.z);
+  mctx.fillStyle = '#ffb020';
+  mctx.beginPath(); mctx.arc(dx,dy,10,0,Math.PI*2); mctx.fill();
+  mctx.strokeStyle = '#fff'; mctx.lineWidth = 3; mctx.stroke();
+
+  // Car
+  if(carX !== undefined){
+    const [cx2,cy2] = w2m(carX, carZ);
+    mctx.save();
+    mctx.translate(cx2, cy2);
+    mctx.rotate(-carAngle);
+    mctx.fillStyle = '#4ea8ff';
+    mctx.shadowColor = '#4ea8ff'; mctx.shadowBlur = 14;
+    mctx.beginPath();
+    mctx.moveTo(0, 14);
+    mctx.lineTo(-10, -10);
+    mctx.lineTo(10, -10);
+    mctx.closePath();
+    mctx.fill();
+    mctx.restore();
+    mctx.shadowBlur = 0;
+  }
+}
+
+/* =========================================================
+   NAV INSTRUCTION
+   ========================================================= */
+function getInstruction(route, carX, carZ){
+  if(!route || route.length < 2) return { dir:'straight', dist:0 };
+  for(let i=1;i<route.length-1;i++){
+    const a = route[i-1], b = route[i], c = route[i+1];
+    const d1 = { x:b.x-a.x, z:b.z-a.z };
+    const d2 = { x:c.x-b.x, z:c.z-b.z };
+    const len1 = Math.hypot(d1.x,d1.z), len2 = Math.hypot(d2.x,d2.z);
+    if(len1 < 0.5 || len2 < 0.5) continue;
+    const cross = (d1.x/len1)*(d2.z/len2) - (d1.z/len1)*(d2.x/len2);
+    const dot = (d1.x/len1)*(d2.x/len2) + (d1.z/len1)*(d2.z/len2);
+    if(cross < -0.35 || dot < 0.4){
+      const dist = Math.hypot(b.x-carX, b.z-carZ);
+      if(dist < 60) return { dir: cross < 0 ? 'left' : 'right', dist };
+    }
+  }
+  const last = route[route.length-1];
+  return { dir:'straight', dist: Math.hypot(last.x-carX, last.z-carZ) };
+}
+
+function updateNavHUD(){
+  $('navScore').textContent = score;
+  $('navTime').textContent = Math.ceil(timeLeft) + 's';
+}
+
+/* =========================================================
+   TASKS
+   ========================================================= */
+function newTask(){
+  let tries = 0;
+  do {
+    const i = Math.floor(Math.random()*GRID);
+    const j = Math.floor(Math.random()*GRID);
+    dest.x = roadCoord(i); dest.z = roadCoord(j);
+    tries++;
+  } while(Math.hypot(dest.x-car.x, dest.z-car.z) < 80 && tries < 40);
+
+  beacon.position.set(dest.x, 0, dest.z);
+  timeLeft = Math.max(50, 100 - level*5);
+  gameActive = true;
+
+  net.send({ type:'task', x:dest.x, z:dest.z, level, score, time:timeLeft });
+}
+function arrive(){
+  gameActive = false;
+  const bonus = Math.round(timeLeft) * 5;
+  score += 100 + bonus;
+  level++;
+  toast(`🎉 وصلت! +${100+bonus}`, 1800);
+  net.send({ type:'progress', level, score, time: timeLeft });
+  setTimeout(newTask, 1500);
+}
+
+/* =========================================================
+   INPUT
+   ========================================================= */
+addEventListener('keydown', e=>{
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+  if(e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') keys.up = true;
+  if(e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') keys.down = true;
+  if(e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = true;
+  if(e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
+  if(e.key === ' ') keys.brake = true;
+  if(e.key === 'c' || e.key === 'C') camMode = (camMode+1) % 3;
+});
+addEventListener('keyup', e=>{
+  if(e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') keys.up = false;
+  if(e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') keys.down = false;
+  if(e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = false;
+  if(e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
+  if(e.key === ' ') keys.brake = false;
+});
+$('camBtn').onclick = ()=>{ camMode = (camMode+1) % 3; toast(['كاميرا خارجية','من الداخل','من الفوق'][camMode], 900); };
+
+/* =========================================================
+   PHYSICS
+   ========================================================= */
+function updateCar(dt){
+  const accel = 30, brakeF = 55, friction = 16;
+  if(keys.up) car.speed += accel * dt;
+  else if(keys.down) car.speed -= brakeF * dt;
+  else {
+    if(car.speed > 0) car.speed = Math.max(0, car.speed - friction*dt);
+    else if(car.speed < 0) car.speed = Math.min(0, car.speed + friction*dt);
+  }
+  if(keys.brake) car.speed *= 0.9;
+
+  car.speed = Math.max(-MAXSPEED*0.45, Math.min(MAXSPEED, car.speed));
+
+  const steer = (keys.left?1:0) - (keys.right?1:0);
+  if(Math.abs(car.speed) > 0.4){
+    const factor = Math.min(1, Math.abs(car.speed)/8);
+    car.angle += steer * 2.1 * dt * factor * Math.sign(car.speed);
+  }
+
+  car.x += Math.sin(car.angle) * car.speed * dt;
+  car.z += Math.cos(car.angle) * car.speed * dt;
+
+  const LIM = WORLD/2 + ROAD_W + 12;
+  car.x = Math.max(-LIM, Math.min(LIM, car.x));
+  car.z = Math.max(-LIM, Math.min(LIM, car.z));
+
+  const r = 1.7;
+  for(const b of buildings){
+    if(car.x > b.minX-r && car.x < b.maxX+r && car.z > b.minZ-r && car.z < b.maxZ+r){
+      const dl = Math.abs(car.x - (b.minX-r));
+      const dr = Math.abs((b.maxX+r) - car.x);
+      const dtp = Math.abs(car.z - (b.minZ-r));
+      const db = Math.abs((b.maxZ+r) - car.z);
+      const mn = Math.min(dl,dr,dtp,db);
+      if(mn === dl) car.x = b.minX - r;
+      else if(mn === dr) car.x = b.maxX + r;
+      else if(mn === dtp) car.z = b.minZ - r;
+      else car.z = b.maxZ + r;
+      car.speed *= 0.25;
+    }
+  }
+
+  carGroup.position.set(car.x, 0, car.z);
+  carGroup.rotation.y = car.angle;
+
+  ring.rotation.z += dt * 1.6;
+  const d = Math.hypot(dest.x-car.x, dest.z-car.z);
+  beam.material.opacity = 0.18 + Math.sin(performance.now()/300)*0.1;
+  return d;
+}
+
+/* =========================================================
+   CAMERA
+   ========================================================= */
+const camTarget = new THREE.Vector3();
+function updateCamera(dt){
+  if(camMode === 0){
+    const back = 9.5, up = 4.6;
+    const tx = car.x - Math.sin(car.angle)*back;
+    const tz = car.z - Math.cos(car.angle)*back;
+    camera.position.lerp(new THREE.Vector3(tx, up, tz), 1 - Math.pow(0.001, dt));
+    camTarget.set(car.x + Math.sin(car.angle)*7, 1.8, car.z + Math.cos(car.angle)*7);
+    camera.lookAt(camTarget);
+  } else if(camMode === 1){
+    const hx = car.x + Math.sin(car.angle)*0.35;
+    const hz = car.z + Math.cos(car.angle)*0.35;
+    camera.position.lerp(new THREE.Vector3(hx, 2.0, hz), 1 - Math.pow(0.0001, dt));
+    camTarget.set(car.x + Math.sin(car.angle)*12, 1.5, car.z + Math.cos(car.angle)*12);
+    camera.lookAt(camTarget);
+  } else {
+    camera.position.lerp(new THREE.Vector3(car.x, 55, car.z - 1), 1 - Math.pow(0.001, dt));
+    camTarget.set(car.x, 0, car.z);
+    camera.lookAt(camTarget);
+  }
+}
+
+/* =========================================================
+   MAIN LOOP
+   ========================================================= */
+let last = performance.now();
+let routeCache = [], routeTimer = 0;
+
+function loop(now){
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (now - last)/1000);
+  last = now;
+
+  if(net.role === 'driver'){
+    const dist = updateCar(dt);
+    updateCamera(dt);
+
+    if(gameActive && net.peerReady){
+      timeLeft -= dt;
+      if(timeLeft <= 0){
+        timeLeft = 0; gameActive = false;
+        toast('⏰ الوقت سالا!', 1800);
+        setTimeout(newTask, 1200);
+      }
+    }
+
+    $('speedVal').textContent = Math.round(Math.abs(car.speed) * 3.6);
+    $('hudDist').textContent = Math.round(dist);
+    $('hudTime').textContent = Math.ceil(timeLeft) + 's';
+    $('hudScore').textContent = score;
+    $('hudLevel').textContent = level;
+
+    if(gameActive && dist < 6) arrive();
+
+    if(net.peerReady && now - lastNetSend > 66){
+      lastNetSend = now;
+      net.send({ type:'state', x:car.x, z:car.z, angle:car.angle, speed:car.speed });
+    }
+  }
+
+  if(net.role === 'navigator'){
+    routeTimer -= dt;
+    if(routeTimer <= 0 && remoteCar.valid){
+      routeCache = computeRoute(remoteCar.x, remoteCar.z, dest.x, dest.z);
+      routeTimer = 0.3;
+    }
+    drawMap(routeCache, remoteCar.x, remoteCar.z, remoteCar.angle);
+
+    const ins = getInstruction(routeCache, remoteCar.x, remoteCar.z);
+    const arrow = ins.dir === 'left' ? '⬅️' : ins.dir === 'right' ? '➡️' : '⬆️';
+    const txt = ins.dir === 'left' ? 'دور على اليسار'
+              : ins.dir === 'right'? 'دور على اليمين'
+              : 'سير نيشان';
+    $('instrArrow').textContent = arrow;
+    $('instrTxt').textContent = txt;
+    $('instrDist').textContent = Math.round(ins.dist) + ' متر';
+    $('navSpeed').textContent = Math.round(Math.abs(remoteCar.speed)*3.6);
+    $('navTime').textContent = Math.ceil(timeLeft) + 's';
+    $('navScore').textContent = score;
+  }
+
+  renderer.render(scene, camera);
+}
+
+/* =========================================================
+   RESIZE
+   ========================================================= */
+function resize(){
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w,h);
+  camera.aspect = w/h;
+  camera.updateProjectionMatrix();
+  if(net.role === 'navigator' && !tablet.classList.contains('hidden')) sizeMap();
+}
+addEventListener('resize', resize);
+
+/* START */
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
